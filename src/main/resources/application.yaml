@@ -1,0 +1,82 @@
+---
+chatx:
+  loadbalancer:
+    sticky:
+      cookies-name: ufs-session
+    proxy-error:
+      code: # ошибки при которых выводится из балансировки
+        - 503
+    health:
+      interval: 1s  # интервал проверки
+      initial-delay: 1s # отложенный запуск проверки
+      error-count: 1  # количество ошибок для вывода из балансировки
+      time-out: 3s
+    instance:
+      helloService:
+        health:
+          health-path: /health # путь к проверки живности
+        hosts: # хосты для балансировки
+          - uri: http://localhost:8081
+            zoneId: MAIN
+          - uri: http://localhost:8082
+            zoneId: MAIN
+          - uri: http://localhost:8083
+            zoneId: SECONDARY
+          - uri: http://localhost:8084
+            zoneId: SECONDARY
+          - uri: http://localhost:8085
+            zoneId: SECONDARY
+
+---
+management:
+  endpoints:
+    enabled-by-default: false
+    web:
+      discovery.enabled: false
+      exposure:
+        include: health,prometheus
+      base-path: "/"
+      path-mapping:
+        health: "healthcheck"
+        prometheus: "metric"
+
+  health:
+    livenessState.enabled: true
+    readinessState.enabled: true
+  endpoint:
+    info.enabled: true
+    prometheus.enabled: true
+    health:
+      enabled: true
+      show-details: always
+      show-components: always
+      probes.enabled: true
+#      group:
+#        readiness:
+#          include:
+#        liveness:
+#          exclude:
+#            - reactiveDiscoveryClients
+#            - discoveryComposite
+
+---
+
+spring:
+  cloud:
+    discovery:
+      client:
+        health-indicator:
+          enabled: false
+    gateway:
+      routes:
+        - id: path_message          # https://docs.spring.io/spring-cloud-commons/docs/current/reference/html/#spring-cloud-loadbalancer
+          uri: lb://helloService    # https://cloud.spring.io/spring-cloud-gateway/reference/html/#gateway-request-predicates-factories
+          predicates:
+            - name: Path
+              args:
+                patterns: /message/** # описание форматата org.springframework.util.AntPathMatcher
+          filters: # https://cloud.spring.io/spring-cloud-gateway/reference/html/#gatewayfilter-factories
+            - PrefixPath=/mypath  # https://cloud.spring.io/spring-cloud-gateway/reference/html/#the-rewritepath-gatewayfilter-factory
+logging:
+  level:
+    ru.sbrf: trace
